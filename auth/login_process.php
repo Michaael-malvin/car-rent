@@ -9,7 +9,7 @@ $password = $_POST['password'];
 $username = mysqli_real_escape_string($conn, $username);
 
 // ambil user
-$query = mysqli_query($conn, "SELECT * FROM users WHERE username='$username'");
+$query = mysqli_query($conn, "SELECT * FROM user WHERE username='$username'");
 $user  = mysqli_fetch_assoc($query);
 
 if ($user) {
@@ -17,9 +17,12 @@ if ($user) {
     if ($password == $user['password']) {
 
         $_SESSION['login'] = true;
-        $_SESSION['id']    = $user['id'];
-        $_SESSION['nama']  = $user['nama'];
-        $_SESSION['role']  = $user['role'];
+        $_SESSION['id_user'] = $user['id_user'];
+        $_SESSION['nama']    = $user['nama'];
+        $_SESSION['role']    = $user['role'];
+
+        // log aktivitas
+        mysqli_query($conn, "INSERT INTO log_aktivitas (id_user, aktivitas) VALUES ('$user[id_user]', 'User login')");
 
         // redirect sesuai role
         if ($user['role'] == 'admin') {

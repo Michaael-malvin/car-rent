@@ -1,0 +1,17 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Base folder
+    RewriteBase /peminjaman_alat/
+
+    # Izinkan akses index
+    RewriteRule ^index\.php$ - [L]
+
+    # Jika file atau folder ada, biarkan
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Semua request arahkan ke index.php
+    RewriteRule ^ index.php [L]
+</IfModule>

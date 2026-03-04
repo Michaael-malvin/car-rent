@@ -3,6 +3,34 @@ include '../config/auth.php';
 include '../config/database.php';
 cekRole('petugas');
 
+// build filter SQL for approval list
+function buildApprovalFilterSql($conn) {
+    $clauses = [];
+    if(!empty($_GET['filter_peminjam'])) {
+        $val = mysqli_real_escape_string($conn, $_GET['filter_peminjam']);
+        $clauses[] = "u.nama LIKE '%$val%'";
+    }
+    if(!empty($_GET['filter_alat'])) {
+        $val = mysqli_real_escape_string($conn, $_GET['filter_alat']);
+        $clauses[] = "a.nama_alat LIKE '%$val%'";
+    }
+    if(!empty($_GET['filter_tgl_pinjam'])) {
+        $val = mysqli_real_escape_string($conn, $_GET['filter_tgl_pinjam']);
+        $clauses[] = "p.tanggal_pinjam='$val'";
+    }
+    if(!empty($_GET['filter_tgl_kembali'])) {
+        $val = mysqli_real_escape_string($conn, $_GET['filter_tgl_kembali']);
+        $clauses[] = "p.tanggal_kembali='$val'";
+    }
+    if(!empty($_GET['filter_jumlah'])) {
+        $val = mysqli_real_escape_string($conn, $_GET['filter_jumlah']);
+        $clauses[] = "p.jumlah='$val'";
+    }
+    return count($clauses) ? ' AND ' . implode(' AND ', $clauses) : '';
+}
+
+$filter_sql = buildApprovalFilterSql($conn);
+
 if (isset($_GET['approve'])) {
     $id_pinjam = $_GET['approve'];
 
@@ -239,6 +267,34 @@ if (isset($_GET['reject'])) {
                     </button>
                 </div>
             </div>
+            <div id="filter-panel" class="hidden bg-gray-50 p-4 rounded-lg mt-4">
+                <form method="get" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Peminjam</label>
+                        <input type="text" name="filter_peminjam" value="<?= htmlspecialchars($_GET['filter_peminjam'] ?? '') ?>" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Alat</label>
+                        <input type="text" name="filter_alat" value="<?= htmlspecialchars($_GET['filter_alat'] ?? '') ?>" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Jumlah</label>
+                        <input type="number" name="filter_jumlah" value="<?= htmlspecialchars($_GET['filter_jumlah'] ?? '') ?>" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Tgl Pinjam</label>
+                        <input type="date" name="filter_tgl_pinjam" value="<?= htmlspecialchars($_GET['filter_tgl_pinjam'] ?? '') ?>" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Tgl Kembali</label>
+                        <input type="date" name="filter_tgl_kembali" value="<?= htmlspecialchars($_GET['filter_tgl_kembali'] ?? '') ?>" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                    <div class="flex items-end space-x-2">
+                        <button type="submit" class="bg-primary text-dark px-4 py-2 rounded-lg">Terapkan</button>
+                        <a href="approval.php" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg">Reset</a>
+                    </div>
+                </form>
+            </div>
         </div>
 
         <!-- Pending Requests -->
@@ -262,7 +318,7 @@ if (isset($_GET['reject'])) {
                 FROM peminjaman p
                 JOIN user u ON p.id_user = u.id_user
                 JOIN alat a ON p.id_alat = a.id_alat
-                WHERE p.status='menunggu'
+                WHERE p.status='menunggu' $filter_sql
                 ORDER BY p.id_pinjam DESC
             ");
 
@@ -412,6 +468,11 @@ if (isset($_GET['reject'])) {
         // Mobile menu toggle
         document.getElementById('mobile-menu-button').addEventListener('click', function() {
             document.getElementById('mobile-menu').classList.toggle('hidden');
+        });
+
+        // Filter panel toggle
+        document.getElementById('filter-btn').addEventListener('click', function() {
+            document.getElementById('filter-panel').classList.toggle('hidden');
         });
 
         // Search functionality

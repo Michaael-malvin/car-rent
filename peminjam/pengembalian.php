@@ -74,6 +74,26 @@ if (isset($_GET['kembali']) && !isset($_POST['submit_return'])) {
                 padding: 1rem 0;
             }
         }
+        
+        /* Custom animations */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Hover effects */
+        .hover-lift {
+            transition: all 0.3s ease;
+        }
+        
+        .hover-lift:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -99,7 +119,7 @@ if (isset($_GET['kembali']) && !isset($_POST['submit_return'])) {
                         <i class="fas fa-plus-circle mr-2"></i>Ajukan
                     </a>
                     <a href="pengembalian.php" class="text-accent font-medium border-b-2 border-primary pb-1">
-                        <i class="fas fa-undo mr-2"></i>Pengembalian Alat
+                        <i class="fas fa-undo mr-2"></i>Pengembalian
                     </a>
                     <a href="aktivitas.php" class="text-gray-700 hover:text-accent transition-colors">
                         <i class="fas fa-history mr-2"></i>Aktivitas
@@ -156,13 +176,13 @@ if (isset($_GET['kembali']) && !isset($_POST['submit_return'])) {
     <!-- Main Content -->
     <main class="container mx-auto px-4 py-8">
         <!-- Page Header -->
-        <div class="mb-8">
+        <div class="mb-8 fade-in">
             <h2 class="text-3xl font-bold text-dark mb-2">Form Pengembalian</h2>
             <p class="text-gray-600">Isi formulir berikut untuk mengembalikan alat yang dipinjam</p>
         </div>
 
         <!-- Return Form -->
-        <div class="bg-white rounded-xl shadow-md overflow-hidden">
+        <div class="bg-white rounded-xl shadow-md overflow-hidden fade-in">
             <div class="p-6 md:p-8">
                 <div class="mb-6">
                     <h3 class="text-xl font-semibold text-dark mb-2">Alat yang Dikembalikan</h3>
@@ -172,17 +192,17 @@ if (isset($_GET['kembali']) && !isset($_POST['submit_return'])) {
                     </div>
                 </div>
 
-                <form method="post" enctype="multipart/form-data">
+                <form method="post" enctype="multipart/form-data" class="space-y-6">
                     <input type="hidden" name="id_pinjam" value="<?= $p['id_pinjam'] ?>">
                     
                     <div class="mb-6">
                         <label for="foto_pengembalian" class="block text-sm font-medium text-gray-700 mb-2">
                             <i class="fas fa-camera mr-2 text-accent"></i>Foto Pengembalian <span class="text-red-500">*</span>
                         </label>
-                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-primary transition-colors">
+                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-primary transition-colors hover-lift">
                             <input type="file" name="foto_pengembalian" id="foto_pengembalian" accept="image/*" required class="hidden">
                             <label for="foto_pengembalian" class="cursor-pointer">
-                                <div id="preview-container" class="mb-2">
+                                <div id="preview-container" class="mb-4">
                                     <i class="fas fa-cloud-upload-alt text-gray-400 text-4xl"></i>
                                 </div>
                                 <p class="text-sm text-gray-600">Klik untuk mengunggah foto</p>
@@ -193,16 +213,22 @@ if (isset($_GET['kembali']) && !isset($_POST['submit_return'])) {
                     
                     <!-- Estimasi denda -->
                     <div class="mb-6">
-                        <p class="text-sm text-gray-700 mb-2">Estimasi Denda Keterlambatan</p>
-                        <div class="bg-gray-50 p-3 rounded-lg mb-2">
-                            <p class="font-medium"><?= $late_days; ?> hari — Rp.<?= number_format($late_denda,0,',','.'); ?></p>
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <p class="text-sm text-gray-700">Estimasi Denda Keterlambatan</p>
+                                <div class="flex items-center space-x-2">
+                                    <i class="fas fa-calendar-alt text-blue-500"></i>
+                                    <p class="text-sm text-gray-700"><?= $late_days; ?> hari</p>
+                                </div>
+                            </div>
+                            <div class="text-lg font-semibold text-dark"><?= $late_denda; ?></div>
                         </div>
-                        <label class="inline-flex items-center">
+                        <label class="inline-flex items-center mt-2">
                             <input type="checkbox" name="pay_now" value="1" class="mr-2">Bayar tunai sekarang (Cash On Spot)
                         </label>
                         <div class="mt-2">
-                            <input type="number" name="pembayaran" min="0" value="<?= $late_denda ?>" class="pl-3 pr-3 py-2 border rounded" />
-                            <p class="text-xs text-gray-500">Masukkan jumlah yang dibayarkan (default = estimasi denda keterlambatan).</p>
+                            <input type="number" name="pembayaran" min="0" value="<?= $late_denda ?>" class="pl-3 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary" />
+                            <p class="text-xs text-gray-500 mt-1">Masukkan jumlah yang dibayarkan (default = estimasi denda keterlambatan).</p>
                         </div>
                     </div>
 
@@ -211,7 +237,7 @@ if (isset($_GET['kembali']) && !isset($_POST['submit_return'])) {
                             <i class="fas fa-clipboard-check mr-2 text-accent"></i>Kondisi Alat <span class="text-red-500">*</span>
                         </label>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <label class="relative border-2 border-gray-200 rounded-lg p-4 cursor-pointer hover:border-primary transition-colors">
+                            <label class="relative border-2 border-gray-200 rounded-lg p-4 cursor-pointer hover:border-primary transition-colors hover-lift">
                                 <input type="radio" name="kondisi" value="aman" required class="sr-only peer" checked>
                                 <div class="flex items-center">
                                     <i class="fas fa-check-circle text-green-500 mr-3"></i>
@@ -223,7 +249,7 @@ if (isset($_GET['kembali']) && !isset($_POST['submit_return'])) {
                                 <div class="absolute inset-0 border-2 border-primary rounded-lg opacity-0 peer-checked:opacity-100 pointer-events-none"></div>
                             </label>
                             
-                            <label class="relative border-2 border-gray-200 rounded-lg p-4 cursor-pointer hover:border-primary transition-colors">
+                            <label class="relative border-2 border-gray-200 rounded-lg p-4 cursor-pointer hover:border-primary transition-colors hover-lift">
                                 <input type="radio" name="kondisi" value="rusak" class="sr-only peer">
                                 <div class="flex items-center">
                                     <i class="fas fa-exclamation-triangle text-yellow-500 mr-3"></i>
@@ -238,7 +264,7 @@ if (isset($_GET['kembali']) && !isset($_POST['submit_return'])) {
                     </div>
                     
                     <div class="flex flex-col sm:flex-row gap-3">
-                        <button type="submit" name="submit_return" class="bg-primary text-dark font-bold py-3 px-6 rounded-lg hover:bg-opacity-90 transition-colors flex items-center justify-center">
+                        <button type="submit" name="submit_return" class="bg-primary text-dark font-bold py-3 px-6 rounded-lg hover:bg-opacity-90 transition-colors flex items-center justify-center hover-lift">
                             <i class="fas fa-paper-plane mr-2"></i>Kirim Pengembalian
                         </button>
                         <a href="pengembalian.php" class="bg-gray-200 text-gray-700 font-bold py-3 px-6 rounded-lg hover:bg-gray-300 transition-colors flex items-center justify-center text-center">
@@ -250,7 +276,7 @@ if (isset($_GET['kembali']) && !isset($_POST['submit_return'])) {
         </div>
 
         <!-- Information Card -->
-        <div class="mt-8 bg-blue-50 border border-blue-200 rounded-xl p-6">
+        <div class="mt-8 bg-blue-50 border border-blue-200 rounded-xl p-6 fade-in">
             <div class="flex items-start">
                 <div class="flex-shrink-0">
                     <i class="fas fa-info-circle text-blue-500 text-xl"></i>
@@ -280,10 +306,6 @@ if (isset($_GET['kembali']) && !isset($_POST['submit_return'])) {
                 </div>
                 <div class="flex items-center space-x-4 text-sm text-gray-400">
                     <span>&copy; 2026 Sistem Peminjaman Alat. All rights reserved.</span>
-                    <span class="hidden md:inline">|</span>
-                    <a href="#" class="hover:text-white transition-colors">Privacy Policy</a>
-                    <span class="hidden md:inline">|</span>
-                    <a href="#" class="hover:text-white transition-colors">Terms of Service</a>
                 </div>
             </div>
         </div>
@@ -303,7 +325,7 @@ if (isset($_GET['kembali']) && !isset($_POST['submit_return'])) {
             if (file) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    preview.innerHTML = `<img src="${e.target.result}" alt="Preview" class="max-h-40 mx-auto rounded">`;
+                    preview.innerHTML = `<img src="${e.target.result}" alt="Preview" class="max-h-40 mx-auto rounded shadow-lg">`;
                 }
                 reader.readAsDataURL(file);
             }
@@ -441,6 +463,26 @@ if (isset($_GET['kembali']) && !isset($_POST['submit_return'])) {
                 padding: 1rem 0;
             }
         }
+        
+        /* Custom animations */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Hover effects */
+        .hover-lift {
+            transition: all 0.3s ease;
+        }
+        
+        .hover-lift:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -462,6 +504,9 @@ if (isset($_GET['kembali']) && !isset($_POST['submit_return'])) {
                     <a href="daftar_alat.php" class="text-gray-700 hover:text-accent transition-colors">
                         <i class="fas fa-box mr-2"></i>Daftar Alat
                     </a>
+                      <a href="ajukan.php" class="text-gray-700 hover:text-accent transition-colors">
+                        <i class="fas fa-plus-circle mr-2"></i>Ajukan Peminjaman
+                    </a>
                     <a href="pengembalian.php" class="text-accent font-medium border-b-2 border-primary pb-1">
                         <i class="fas fa-undo mr-2"></i>Pengembalian
                     </a>
@@ -478,6 +523,9 @@ if (isset($_GET['kembali']) && !isset($_POST['submit_return'])) {
                         </div>
                         <span class="font-medium text-dark"><?= $_SESSION['nama']; ?></span>
                     </div>
+                    <a href="../auth/logout.php" class="hidden md:flex items-center text-red-600 hover:text-red-700 transition-colors">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </a>
                     <button id="mobile-menu-button" class="md:hidden text-dark">
                         <i class="fas fa-bars text-xl"></i>
                     </button>
@@ -495,10 +543,6 @@ if (isset($_GET['kembali']) && !isset($_POST['submit_return'])) {
                 <a href="daftar_alat.php" class="text-gray-700 hover:text-accent transition-colors flex items-center space-x-2">
                     <i class="fas fa-box"></i>
                     <span>Daftar Alat</span>
-                </a>
-                <a href="pengembalian.php" class="text-accent font-medium flex items-center space-x-2">
-                    <i class="fas fa-undo"></i>
-                    <span>Pengembalian</span>
                 </a>
                 <a href="aktivitas.php" class="text-gray-700 hover:text-accent transition-colors flex items-center space-x-2">
                     <i class="fas fa-history"></i>
@@ -521,14 +565,14 @@ if (isset($_GET['kembali']) && !isset($_POST['submit_return'])) {
     <!-- Main Content -->
     <main class="container mx-auto px-4 py-8">
         <!-- Page Header -->
-        <div class="mb-8">
+        <div class="mb-8 fade-in">
             <h2 class="text-3xl font-bold text-dark mb-2">Pengembalian Alat</h2>
             <p class="text-gray-600">Kelola pengembalian alat yang telah Anda pinjam</p>
         </div>
 
         <!-- Success/Error Messages -->
         <?php if(isset($_SESSION['success_msg'])): ?>
-            <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-6 rounded-lg flex items-center">
+            <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-6 rounded-lg flex items-center fade-in">
                 <i class="fas fa-check-circle mr-3"></i>
                 <span><?= $_SESSION['success_msg']; ?></span>
             </div>
@@ -536,7 +580,7 @@ if (isset($_GET['kembali']) && !isset($_POST['submit_return'])) {
         <?php endif; ?>
 
         <?php if(isset($_SESSION['error_msg'])): ?>
-            <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-lg flex items-center">
+            <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-lg flex items-center fade-in">
                 <i class="fas fa-exclamation-circle mr-3"></i>
                 <span><?= $_SESSION['error_msg']; ?></span>
             </div>
@@ -584,7 +628,15 @@ if (isset($_GET['kembali']) && !isset($_POST['submit_return'])) {
                         }
                     }
                     
-                    echo '<div class="border rounded-lg p-4 ' . ($is_overdue ? 'border-red-200 bg-red-50' : 'border-gray-200') . '">';
+                    // Card styling based on status
+                    $card_class = 'border rounded-lg p-4 transition-all hover:shadow-md hover-lift';
+                    if ($is_overdue) {
+                        $card_class .= ' border-red-200 bg-red-50';
+                    } else {
+                        $card_class .= ' border-gray-200';
+                    }
+                    
+                    echo '<div class="' . $card_class . '">';
                     echo '<div class="flex flex-col md:flex-row md:items-center md:justify-between">';
                     
                     // Tool Info
@@ -619,7 +671,7 @@ if (isset($_GET['kembali']) && !isset($_POST['submit_return'])) {
                     if ($has_return) {
                         echo '<span class="' . $status_color . ' px-3 py-1 rounded-full text-xs font-medium">' . $return_status . '</span>';
                     } else {
-                        echo '<a href="?kembali=' . $p['id_pinjam'] . '" class="bg-primary text-dark px-4 py-2 rounded-lg hover:bg-opacity-90 transition-colors font-medium flex items-center">';
+                        echo '<a href="?kembali=' . $p['id_pinjam'] . '" class="bg-primary text-dark px-4 py-2 rounded-lg hover:bg-opacity-90 transition-colors font-medium flex items-center hover-lift">';
                         echo '<i class="fas fa-undo mr-2"></i>Kembalikan';
                         echo '</a>';
                     }

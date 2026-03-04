@@ -2,6 +2,63 @@
 include '../config/auth.php';
 include '../config/database.php';
 cekRole('admin');
+
+// build optional filter SQL for admin peminjaman list
+function buildAdminFilterSql($conn) {
+    $clauses = [];
+    if(!empty($_GET['filter_peminjam'])) {
+        $val = mysqli_real_escape_string($conn, $_GET['filter_peminjam']);
+        $clauses[] = "u.nama LIKE '%$val%'";
+    }
+    if(!empty($_GET['filter_alat'])) {
+        $val = mysqli_real_escape_string($conn, $_GET['filter_alat']);
+        $clauses[] = "a.nama_alat LIKE '%$val%'";
+    }
+    if(!empty($_GET['filter_status'])) {
+        $val = mysqli_real_escape_string($conn, $_GET['filter_status']);
+        $clauses[] = "p.status='$val'";
+    }
+    if(!empty($_GET['filter_tgl_pinjam'])) {
+        $val = mysqli_real_escape_string($conn, $_GET['filter_tgl_pinjam']);
+        $clauses[] = "p.tanggal_pinjam='$val'";
+    }
+    if(!empty($_GET['filter_tgl_kembali'])) {
+        $val = mysqli_real_escape_string($conn, $_GET['filter_tgl_kembali']);
+        $clauses[] = "p.tanggal_kembali='$val'";
+    }
+    return count($clauses) ? ' AND ' . implode(' AND ', $clauses) : '';
+}
+
+$filter_sql = buildAdminFilterSql($conn);
+
+// handle CSV export
+if (isset($_GET['download_csv'])) {
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="Data_Peminjaman_' . date('Ymd_His') . '.csv"');
+    $output = fopen('php://output', 'w');
+    fputcsv($output, ['Peminjam','Alat','Jumlah','Tgl Pinjam','Tgl Kembali','Status']);
+    $q = mysqli_query($conn, "
+        SELECT p.jumlah, p.tanggal_pinjam, p.tanggal_kembali, p.status, 
+               u.nama AS nama_peminjam, a.nama_alat 
+        FROM peminjaman p
+        JOIN `user` u ON p.id_user = u.id_user
+        JOIN alat a ON p.id_alat = a.id_alat
+        WHERE 1=1 $filter_sql
+        ORDER BY p.tanggal_pinjam DESC
+    ");
+    while($p = mysqli_fetch_assoc($q)){
+        fputcsv($output, [
+            $p['nama_peminjam'],
+            $p['nama_alat'],
+            $p['jumlah'],
+            $p['tanggal_pinjam'],
+            $p['tanggal_kembali'],
+            ucfirst($p['status'])
+        ]);
+    }
+    fclose($output);
+    exit;
+}
 ?>
 
 <!DOCTYPE html>
@@ -260,10 +317,16 @@ cekRole('admin');
                     </div>
                 </div>
                 <div class="flex gap-2">
-                    <button id="export-btn" class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-2">
+                    <?php
+                        // build export URL keeping existing filters/search
+                        $params = $_GET;
+                        $params['download_csv'] = 1;
+                        $export_url = 'peminjaman.php?' . http_build_query($params);
+                    ?>
+                    <a href="<?= htmlspecialchars($export_url) ?>" class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-2">
                         <i class="fas fa-download"></i>
                         <span>Export</span>
-                    </button>
+                    </a>
                     <button id="refresh-btn" class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-2">
                         <i class="fas fa-sync-alt"></i>
                         <span>Refresh</span>
@@ -298,6 +361,7 @@ cekRole('admin');
                             FROM peminjaman p
                             JOIN `user` u ON p.id_user = u.id_user
                             JOIN alat a ON p.id_alat = a.id_alat
+                            WHERE 1=1 $filter_sql
                             ORDER BY p.tanggal_pinjam DESC
                         ");
 
@@ -435,11 +499,6 @@ cekRole('admin');
             location.reload();
         });
 
-        // Export button (placeholder functionality)
-        document.getElementById('export-btn').addEventListener('click', function() {
-            // In a real implementation, this would generate and download a CSV or Excel file
-            alert('Fitur export akan segera tersedia!');
-        });
     </script>
 </body>
 </html>

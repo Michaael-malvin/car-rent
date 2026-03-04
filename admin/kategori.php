@@ -241,8 +241,16 @@ if (isset($_GET['edit'])) {
                             $count_q = mysqli_query($conn, "SELECT COUNT(*) as total FROM alat WHERE kategori='" . $k['nama_kategori'] . "'");
                             $count_result = mysqli_fetch_assoc($count_q);
                             $tool_count = $count_result['total'];
+
+                            // build list of alat names for modal
+                            $tools = [];
+                            $tq = mysqli_query($conn, "SELECT nama_alat FROM alat WHERE kategori='" . mysqli_real_escape_string($conn, $k['nama_kategori']) . "'");
+                            while($tr = mysqli_fetch_assoc($tq)) {
+                                $tools[] = $tr['nama_alat'];
+                            }
+                            $data_tools = htmlspecialchars(json_encode($tools), ENT_QUOTES, 'UTF-8');
                         ?>
-                        <div class="border rounded-lg p-4 hover:shadow-md transition-all category-card" data-name="<?= strtolower($k['nama_kategori']) ?>">
+                        <div class="border rounded-lg p-4 hover:shadow-md transition-all category-card" data-name="<?= strtolower($k['nama_kategori']) ?>" data-tools="<?= $data_tools ?>">
                             <div class="flex items-start justify-between">
                                 <div class="flex items-center">
                                     <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center mr-3">
@@ -319,6 +327,17 @@ if (isset($_GET['edit'])) {
         </div>
     </div>
 
+    <!-- Tools List Modal -->
+    <div id="tools-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg overflow-hidden w-11/12 max-w-md">
+            <div class="px-6 py-4 border-b flex justify-between items-center">
+                <h3 id="tools-modal-title" class="text-lg font-semibold"></h3>
+                <button id="tools-modal-close" class="text-gray-600 hover:text-gray-900 text-2xl leading-none">&times;</button>
+            </div>
+            <div class="p-6" id="tools-modal-content"></div>
+        </div>
+    </div>
+
     <script>
         // Mobile menu toggle
         document.getElementById('mobile-menu-button').addEventListener('click', function() {
@@ -370,7 +389,34 @@ if (isset($_GET['edit'])) {
         window.addEventListener('click', function(event) {
             if (event.target === document.getElementById('delete-modal')) {
                 document.getElementById('delete-modal').classList.add('hidden');
-                deleteCategoryId = null;
+            }
+        });
+
+        // Show tools modal when a category card is clicked
+        document.querySelectorAll('.category-card').forEach(card => {
+            card.addEventListener('click', function() {
+                const tools = JSON.parse(this.dataset.tools || '[]');
+                const name = this.dataset.name;
+                let html = '';
+                if (tools.length) {
+                    html = '<ul class="list-disc list-inside">';
+                    tools.forEach(t => { html += '<li>' + t + '</li>'; });
+                    html += '</ul>';
+                } else {
+                    html = '<p class="text-gray-500">Tidak ada alat di kategori ini.</p>';
+                }
+                document.getElementById('tools-modal-title').textContent = 'Alat dalam kategori ' + name;
+                document.getElementById('tools-modal-content').innerHTML = html;
+                document.getElementById('tools-modal').classList.remove('hidden');
+            });
+        });
+
+        document.getElementById('tools-modal-close').addEventListener('click', function() {
+            document.getElementById('tools-modal').classList.add('hidden');
+        });
+        document.getElementById('tools-modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                this.classList.add('hidden');
             }
         });
     </script>

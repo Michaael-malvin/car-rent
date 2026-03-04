@@ -3,6 +3,42 @@ include '../config/auth.php';
 include '../config/database.php';
 cekRole('petugas');
 
+// build filter SQL from GET parameters
+function buildFilterSql($conn) {
+    $clauses = [];
+    if(!empty($_GET['filter_peminjam'])) {
+        $val = mysqli_real_escape_string($conn, $_GET['filter_peminjam']);
+        $clauses[] = "u.nama LIKE '%$val%'";
+    }
+    if(!empty($_GET['filter_alat'])) {
+        $val = mysqli_real_escape_string($conn, $_GET['filter_alat']);
+        $clauses[] = "a.nama_alat LIKE '%$val%'";
+    }
+    if(!empty($_GET['filter_status'])) {
+        $val = mysqli_real_escape_string($conn, $_GET['filter_status']);
+        $clauses[] = "p.status='$val'";
+    }
+    if(!empty($_GET['filter_tgl_pinjam'])) {
+        $val = mysqli_real_escape_string($conn, $_GET['filter_tgl_pinjam']);
+        $clauses[] = "p.tanggal_pinjam='$val'";
+    }
+    if(!empty($_GET['filter_tgl_kembali'])) {
+        $val = mysqli_real_escape_string($conn, $_GET['filter_tgl_kembali']);
+        $clauses[] = "p.tanggal_kembali='$val'";
+    }
+    if(!empty($_GET['filter_kondisi'])) {
+        $val = mysqli_real_escape_string($conn, $_GET['filter_kondisi']);
+        $clauses[] = "k.kondisi='$val'";
+    }
+    if(!empty($_GET['filter_terlambat'])) {
+        $val = mysqli_real_escape_string($conn, $_GET['filter_terlambat']);
+        $clauses[] = "k.terlambat='$val'";
+    }
+    return count($clauses) ? ' AND ' . implode(' AND ', $clauses) : '';
+}
+
+$filter_sql = buildFilterSql($conn);
+
 // Download PDF as printable HTML
 if (isset($_GET['download_pdf'])) {
     header('Content-Type: text/html; charset=utf-8');
@@ -42,6 +78,7 @@ if (isset($_GET['download_pdf'])) {
                 border: 1px solid #000; 
                 padding: 8px; 
                 text-align: left; 
+                vertical-align: top;
             }
             th { 
                 background-color: #ddd; 
@@ -50,6 +87,9 @@ if (isset($_GET['download_pdf'])) {
             .status-approved { background-color: #d4edda; }
             .status-pending { background-color: #fff3cd; }
             .status-rejected { background-color: #f8d7da; }
+            .late { background-color: #f8d7da; }
+            .damaged { background-color: #fff3cd; }
+            .ontime { background-color: #d4edda; }
             .footer {
                 margin-top: 30px;
                 font-size: 10px;
@@ -82,26 +122,61 @@ if (isset($_GET['download_pdf'])) {
             <th>Tgl Kembali</th>
             <th>Tgl Dikembalikan</th>
             <th>Status</th>
+            <th>Keterlambatan</th>
+            <th>Kondisi</th>
+            <th>Denda Keterlambatan</th>
+            <th>Denda Kerusakan</th>
+            <th>Total Denda</th>
         </tr>
         </thead>
         <tbody>';
     
     $q = mysqli_query($conn,"
         SELECT p.id_pinjam, p.id_user, p.id_alat, p.jumlah, p.tanggal_pinjam, p.tanggal_kembali, p.status,
-               k.tanggal_dikembalikan, u.nama as nama_peminjam, a.nama_alat
+               k.tanggal_dikembalikan, k.kondisi, k.terlambat, k.denda, k.denda_kerusakan, k.konfirmasi_kerusakan,
+               u.nama as nama_peminjam, a.nama_alat
         FROM peminjaman p
         JOIN user u ON p.id_user = u.id_user
         JOIN alat a ON p.id_alat = a.id_alat
         LEFT JOIN pengembalian k ON p.id_pinjam = k.id_pinjam
+        WHERE 1=1 $filter_sql
         ORDER BY p.tanggal_pinjam DESC
     ");
     
     $no = 1;
     while($l = mysqli_fetch_assoc($q)){
         $tanggal_dikembalikan = $l['tanggal_dikembalikan'] ?? '-';
-        $status_class = 'status-' . str_replace('selesai', 'approved', str_replace('menunggu', 'pending', str_replace('ditolak', 'rejected', $l['status'])));
+        $status_class = '';
+        $late_class = '';
+        $kondisi_class = '';
         
-        echo '<tr class="' . $status_class . '">
+        // Status styling
+        if ($l['status'] === 'disetujui') {
+            $status_class = 'status-approved';
+        } elseif ($l['status'] === 'selesai') {
+            $status_class = 'status-rejected';
+        } else {
+            $status_class = 'status-pending';
+        }
+        
+        // Keterlambatan styling
+        if ($l['terlambat'] == 1) {
+            $late_class = 'late';
+        }
+        
+        // Kondisi styling
+        if ($l['kondisi'] === 'rusak') {
+            $kondisi_class = 'damaged';
+        }
+        
+        // Calculate values
+        $terlambat_text = $l['terlambat'] == 1 ? 'Ya (' . $l['denda'] . ')' : 'Tidak';
+        $kondisi_text = $l['kondisi'] == 'rusak' ? 'Rusak' : 'Baik';
+        $denda_kerusakan_text = $l['denda_kerusakan'] > 0 ? 'Rp.' . number_format($l['denda_kerusakan'], 0, ',', '.') : '-';
+        $total_denda = ($l['denda'] ?? 0) + ($l['denda_kerusakan'] ?? 0);
+        $total_denda_text = $total_denda > 0 ? 'Rp.' . number_format($total_denda, 0, ',', '.') : '-';
+        
+        echo '<tr class="' . $status_class . ' ' . $late_class . ' ' . $kondisi_class . '">
             <td>' . $no++ . '</td>
             <td>' . htmlspecialchars($l['nama_peminjam']) . '</td>
             <td>' . htmlspecialchars($l['nama_alat']) . '</td>
@@ -110,6 +185,11 @@ if (isset($_GET['download_pdf'])) {
             <td>' . $l['tanggal_kembali'] . '</td>
             <td>' . $tanggal_dikembalikan . '</td>
             <td>' . ucfirst($l['status']) . '</td>
+            <td>' . $terlambat_text . '</td>
+            <td>' . $kondisi_text . '</td>
+            <td>' . ($l['denda'] > 0 ? 'Rp.' . number_format($l['denda'], 0, ',', '.') : '-') . '</td>
+            <td>' . $denda_kerusakan_text . '</td>
+            <td>' . $total_denda_text . '</td>
         </tr>';
     }
     
@@ -133,12 +213,13 @@ if (isset($_GET['download_csv'])) {
     $output = fopen('php://output', 'w');
     
     // Header CSV
-    fputcsv($output, ['No', 'Peminjam', 'Alat', 'Jumlah', 'Tgl Pinjam', 'Tgl Kembali', 'Tgl Dikembalikan', 'Status']);
+    fputcsv($output, ['No', 'Peminjam', 'Alat', 'Jumlah', 'Tgl Pinjam', 'Tgl Kembali', 'Tgl Dikembalikan', 'Status', 'Keterlambatan', 'Kondisi', 'Denda Keterlambatan', 'Denda Kerusakan', 'Total Denda']);
     
     // Data CSV
     $q = mysqli_query($conn,"
         SELECT p.id_pinjam, p.id_user, p.id_alat, p.jumlah, p.tanggal_pinjam, p.tanggal_kembali, p.status,
-               k.tanggal_dikembalikan, u.nama as nama_peminjam, a.nama_alat
+               k.tanggal_dikembalikan, k.kondisi, k.terlambat, k.denda, k.denda_kerusakan, k.konfirmasi_kerusakan,
+               u.nama as nama_peminjam, a.nama_alat
         FROM peminjaman p
         JOIN user u ON p.id_user = u.id_user
         JOIN alat a ON p.id_alat = a.id_alat
@@ -149,7 +230,13 @@ if (isset($_GET['download_csv'])) {
     $no = 1;
     while($l = mysqli_fetch_assoc($q)){
         $tanggal_dikembalikan = $l['tanggal_dikembalikan'] ?? '-';
-        fputcsv($output, [$no++, $l['nama_peminjam'], $l['nama_alat'], $l['jumlah'], $l['tanggal_pinjam'], $l['tanggal_kembali'], $tanggal_dikembalikan, $l['status']]);
+        $terlambat_text = $l['terlambat'] == 1 ? 'Ya (' . $l['denda'] . ')' : 'Tidak';
+        $kondisi_text = $l['kondisi'] == 'rusak' ? 'Rusak' : 'Baik';
+        $denda_kerusakan_text = $l['denda_kerusakan'] > 0 ? 'Rp.' . number_format($l['denda_kerusakan'], 0, ',', '.') : '-';
+        $total_denda = ($l['denda'] ?? 0) + ($l['denda_kerusakan'] ?? 0);
+        $total_denda_text = $total_denda > 0 ? 'Rp.' . number_format($total_denda, 0, ',', '.') : '-';
+        
+        fputcsv($output, [$no++, $l['nama_peminjam'], $l['nama_alat'], $l['jumlah'], $l['tanggal_pinjam'], $l['tanggal_kembali'], $tanggal_dikembalikan, $l['status'], $terlambat_text, $kondisi_text, ($l['denda'] > 0 ? 'Rp.' . number_format($l['denda'], 0, ',', '.') : '-'), $denda_kerusakan_text, $total_denda_text]);
     }
     
     fclose($output);
@@ -412,11 +499,53 @@ if (isset($_GET['download_csv'])) {
                 </div>
             </div>
             
+            <div id="filter-panel" class="hidden bg-gray-50 p-4 rounded-lg mb-4">
+                <form method="get" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Peminjam</label>
+                        <input type="text" name="filter_peminjam" value="<?= htmlspecialchars($_GET['filter_peminjam'] ?? '') ?>" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Alat</label>
+                        <input type="text" name="filter_alat" value="<?= htmlspecialchars($_GET['filter_alat'] ?? '') ?>" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Status</label>
+                        <select name="filter_status" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                            <option value="">Semua</option>
+                            <option value="menunggu" <?= (($_GET['filter_status'] ?? '')=='menunggu'?'selected':'') ?>>Menunggu</option>
+                            <option value="disetujui" <?= (($_GET['filter_status'] ?? '')=='disetujui'?'selected':'') ?>>Disetujui</option>
+                            <option value="selesai" <?= (($_GET['filter_status'] ?? '')=='selesai'?'selected':'') ?>>Selesai</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Tgl Pinjam</label>
+                        <input type="date" name="filter_tgl_pinjam" value="<?= htmlspecialchars($_GET['filter_tgl_pinjam'] ?? '') ?>" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Tgl Kembali</label>
+                        <input type="date" name="filter_tgl_kembali" value="<?= htmlspecialchars($_GET['filter_tgl_kembali'] ?? '') ?>" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                    <div class="flex items-end space-x-2">
+                        <button type="submit" class="bg-primary text-dark px-4 py-2 rounded-lg">Terapkan</button>
+                        <a href="laporan.php" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg">Reset</a>
+                    </div>
+                </form>
+            </div>
+
             <div class="flex flex-wrap gap-2">
-                <a href="?download_pdf=1" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center">
+                <?php
+                    $params = $_GET;
+                    $params['download_pdf'] = 1;
+                    $pdf_url = 'laporan.php?' . http_build_query($params);
+                    $params['download_csv'] = 1;
+                    unset($params['download_pdf']);
+                    $csv_url = 'laporan.php?' . http_build_query($params);
+                ?>
+                <a href="<?= htmlspecialchars($pdf_url) ?>" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center">
                     <i class="fas fa-file-pdf mr-2"></i>Download PDF
                 </a>
-                <a href="?download_csv=1" class="bg-cyan-600 text-white px-4 py-2 rounded-lg hover:bg-cyan-700 transition-colors flex items-center">
+                <a href="<?= htmlspecialchars($csv_url) ?>" class="bg-cyan-600 text-white px-4 py-2 rounded-lg hover:bg-cyan-700 transition-colors flex items-center">
                     <i class="fas fa-file-csv mr-2"></i>Download CSV
                 </a>
                 <button onclick="window.print()" class="bg-accent text-white px-4 py-2 rounded-lg hover:bg-secondary transition-colors flex items-center">
@@ -443,19 +572,17 @@ if (isset($_GET['download_csv'])) {
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tgl Kembali</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tgl Dikembalikan</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Keterlambatan</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kondisi</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Denda Keterlambatan</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Denda Kerusakan</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Denda</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         <?php
                         $q = mysqli_query($conn,"
-                            SELECT p.id_pinjam, p.id_user, p.id_alat, p.jumlah, p.tanggal_pinjam, p.tanggal_kembali, p.status,
-                                   k.tanggal_dikembalikan, u.nama as nama_peminjam, a.nama_alat
-                            FROM peminjaman p
-                            JOIN user u ON p.id_user = u.id_user
-                            JOIN alat a ON p.id_alat = a.id_alat
-                            LEFT JOIN pengembalian k ON p.id_pinjam = k.id_pinjam
-                            ORDER BY p.tanggal_pinjam DESC
-                        ");
+                            SELECT p.id_pinjam, p.id_user, p.id_alat, p.jumlah, p.tanggal_pinjam, p.tanggal_kembali, p.status,\n                                   k.tanggal_dikembalikan, k.kondisi, k.terlambat, k.denda, k.denda_kerusakan, k.konfirmasi_kerusakan,\n                                   u.nama as nama_peminjam, a.nama_alat\n                            FROM peminjaman p\n                            JOIN user u ON p.id_user = u.id_user\n                            JOIN alat a ON p.id_alat = a.id_alat\n                            LEFT JOIN pengembalian k ON p.id_pinjam = k.id_pinjam\n                            WHERE 1=1 $filter_sql\n                            ORDER BY p.tanggal_pinjam DESC\n                        ");
 
                         if(mysqli_num_rows($q) > 0) {
                             $no = 1;
@@ -463,6 +590,15 @@ if (isset($_GET['download_csv'])) {
                                 $tanggal_dikembalikan = $l['tanggal_dikembalikan'] ?? '-';
                                 $row_class = '';
                                 $status_badge = '';
+                                $late_badge = '';
+                                $kondisi_badge = '';
+                                
+                                // Calculate values
+                                $terlambat_text = $l['terlambat'] == 1 ? 'Ya (' . $l['denda'] . ')' : 'Tidak';
+                                $kondisi_text = $l['kondisi'] == 'rusak' ? 'Rusak' : 'Baik';
+                                $denda_kerusakan_text = $l['denda_kerusakan'] > 0 ? 'Rp.' . number_format($l['denda_kerusakan'], 0, ',', '.') : '-';
+                                $total_denda = ($l['denda'] ?? 0) + ($l['denda_kerusakan'] ?? 0);
+                                $total_denda_text = $total_denda > 0 ? 'Rp.' . number_format($total_denda, 0, ',', '.') : '-';
                                 
                                 if($l['status'] === 'disetujui') {
                                     $status_badge = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800"><i class="fas fa-hand-holding mr-1"></i>Sedang Dipinjam</span>';
@@ -471,6 +607,14 @@ if (isset($_GET['download_csv'])) {
                                 } else {
                                     $status_badge = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800"><i class="fas fa-clock mr-1"></i>Menunggu</span>';
                                     $row_class = 'bg-yellow-50';
+                                }
+                                
+                                if ($l['terlambat'] == 1) {
+                                    $late_badge = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800"><i class="fas fa-exclamation-triangle mr-1"></i>Terlambat</span>';
+                                }
+                                
+                                if ($l['kondisi'] === 'rusak') {
+                                    $kondisi_badge = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800"><i class="fas fa-exclamation-triangle mr-1"></i>Rusak</span>';
                                 }
                         ?>
                         <tr class="<?= $row_class ?> report-row" data-peminjam="<?= strtolower($l['nama_peminjam']) ?>" data-alat="<?= strtolower($l['nama_alat']) ?>">
@@ -482,11 +626,16 @@ if (isset($_GET['download_csv'])) {
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?= $l['tanggal_kembali']; ?></td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?= $tanggal_dikembalikan; ?></td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm"><?= $status_badge; ?></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm"><?= $late_badge; ?></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm"><?= $kondisi_badge; ?></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?= ($l['denda'] > 0 ? 'Rp.' . number_format($l['denda'], 0, ',', '.') : '-'); ?></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?= $denda_kerusakan_text; ?></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><?= $total_denda_text; ?></td>
                         </tr>
                         <?php 
                             }
                         } else {
-                            echo '<tr><td colspan="8" class="px-6 py-4 text-center text-sm text-gray-500">Tidak ada data peminjaman.</td></tr>';
+                            echo '<tr><td colspan="14" class="px-6 py-4 text-center text-sm text-gray-500">Tidak ada data peminjaman.</td></tr>';
                         }
                         ?>
                     </tbody>
@@ -515,10 +664,6 @@ if (isset($_GET['download_csv'])) {
                 </div>
                 <div class="flex items-center space-x-4 text-sm text-gray-400">
                     <span>&copy; 2026 Sistem Peminjaman Alat. All rights reserved.</span>
-                    <span class="hidden md:inline">|</span>
-                    <a href="#" class="hover:text-white transition-colors">Privacy Policy</a>
-                    <span class="hidden md:inline">|</span>
-                    <a href="#" class="hover:text-white transition-colors">Terms of Service</a>
                 </div>
             </div>
         </div>
@@ -528,6 +673,11 @@ if (isset($_GET['download_csv'])) {
         // Mobile menu toggle
         document.getElementById('mobile-menu-button').addEventListener('click', function() {
             document.getElementById('mobile-menu').classList.toggle('hidden');
+        });
+
+        // Filter panel toggle
+        document.getElementById('filter-btn').addEventListener('click', function() {
+            document.getElementById('filter-panel').classList.toggle('hidden');
         });
 
         // Search functionality

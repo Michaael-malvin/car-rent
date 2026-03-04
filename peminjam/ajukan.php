@@ -23,9 +23,9 @@ if (isset($_POST['ajukan'])) {
     $tanggal_pinjam = $_POST['tgl_pinjam'];
     $tanggal_kembali = $_POST['tgl_kembali'];
     
-    // Validasi tanggal
-    if (strtotime($tanggal_kembali) <= strtotime($tanggal_pinjam)) {
-        $_SESSION['error_msg'] = "Tanggal kembali harus lebih dari tanggal pinjam!";
+    // Validasi tanggal: kembali boleh sama hari atau setelah pinjam, tapi tidak boleh sebelum
+    if (strtotime($tanggal_kembali) < strtotime($tanggal_pinjam)) {
+        $_SESSION['error_msg'] = "Tanggal kembali tidak boleh sebelum tanggal pinjam!";
     } else {
         // Validasi stok: cek apakah stok tersedia sesuai jumlah yang diminta
         $stok_q = mysqli_query($conn,"SELECT stok FROM alat WHERE id_alat='$id_alat'");
@@ -342,11 +342,8 @@ if (isset($_POST['ajukan'])) {
         function updateMinTglKembali() {
             const tglPinjam = document.getElementById('tgl_pinjam').value;
             if (tglPinjam) {
-                const [year, month, day] = tglPinjam.split('-');
-                const date = new Date(year, month - 1, day);
-                date.setDate(date.getDate() + 1); // Tambah 1 hari
-                
-                const minDate = date.toISOString().split('T')[0];
+                // kembali bisa hari yang sama
+                const minDate = tglPinjam;
                 document.getElementById('tgl_kembali').min = minDate;
                 document.getElementById('tgl_kembali').value = minDate; // Set automatic default
             }
